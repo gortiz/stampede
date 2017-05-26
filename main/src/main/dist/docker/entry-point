@@ -15,6 +15,7 @@ then
     DEFAULT_TORODB_BACKEND_HOST="$(/sbin/ip route|awk '/default/ { print $3 }')"
     DEFAULT_TORODB_SYNC_SOURCE="$(/sbin/ip route|awk '/default/ { print $3 }'):27017"
     
+    TORODB_BACKEND="${TORODB_BACKEND:-postgres}"
     TORODB_BACKEND_HOST="${TORODB_BACKEND_HOST:-$DEFAULT_TORODB_BACKEND_HOST}"
     TORODB_BACKEND_PORT="${TORODB_BACKEND_PORT:-5432}"
     TORODB_BACKEND_DATABASE="${TORODB_BACKEND_DATABASE:-torod}"
@@ -24,42 +25,45 @@ then
     
     if "${TORODB_SETUP:-false}"
     then
-        echo "$TORODB_BACKEND_HOST:$TORODB_BACKEND_PORT:*:postgres:$POSTGRES_PASSWORD" > ~/.pgpass
-        chmod 400 ~/.pgpass
-    
-        timeout=0
-        while ! psql --no-readline \
-            -U "postgres" \
-            -h "$TORODB_BACKEND_HOST" \
-            -p "$TORODB_BACKEND_PORT" \
-            -c "SELECT 1" > /dev/null 2>&1 && [ $timeout -lt 5 ]
-        do
-            sleep $((timeout++))
-        done
+        if [ "${TORODB_BACKEND}" == "postgres" ]
+        then
+            echo "$TORODB_BACKEND_HOST:$TORODB_BACKEND_PORT:*:postgres:$POSTGRES_PASSWORD" > ~/.pgpass
+            chmod 400 ~/.pgpass
         
-        if [ -z "$POSTGRES_PASSWORD" ] && [ $timeout -ge 5 ]
-        then
-            echo "You must set POSTGRES_PASSWORD environment variable with passowrd for user postgres that will be used to setup database" >&2
-            exit 1
-        fi
-
-        if ! psql --no-readline \
-            -U "$TORODB_BACKEND_USER" \
-            -h "$TORODB_BACKEND_HOST" \
-            -p "$TORODB_BACKEND_PORT" \
-            -d "$TORODB_BACKEND_DATABASE" \
-            -c "SELECT 1" > /dev/null 2>&1
-        then
-            @{assembler.name}-setup \
-                --backend-host "$TORODB_BACKEND_HOST" \
-                --backend-port "$TORODB_BACKEND_PORT" \
-                --backend-database "$TORODB_BACKEND_DATABASE" \
-                --backend-user "$TORODB_BACKEND_USER" \
-                --sync-source "$TORODB_SYNC_SOURCE" \
-                "$@"
-        else
-            echo "Database already configured. Skipping."
-            TORODB_SETUP=false
+            timeout=0
+            while ! psql --no-readline \
+                -U "postgres" \
+                -h "$TORODB_BACKEND_HOST" \
+                -p "$TORODB_BACKEND_PORT" \
+                -c "SELECT 1" > /dev/null 2>&1 && [ $timeout -lt 5 ]
+            do
+                sleep $((timeout++))
+            done
+            
+            if [ -z "$POSTGRES_PASSWORD" ] && [ $timeout -ge 5 ]
+            then
+                echo "You must set POSTGRES_PASSWORD environment variable with passowrd for user postgres that will be used to setup database" >&2
+                exit 1
+            fi
+    
+            if ! psql --no-readline \
+                -U "$TORODB_BACKEND_USER" \
+                -h "$TORODB_BACKEND_HOST" \
+                -p "$TORODB_BACKEND_PORT" \
+                -d "$TORODB_BACKEND_DATABASE" \
+                -c "SELECT 1" > /dev/null 2>&1
+            then
+                @{assembler.name}-setup \
+                    --backend-host "$TORODB_BACKEND_HOST" \
+                    --backend-port "$TORODB_BACKEND_PORT" \
+                    --backend-database "$TORODB_BACKEND_DATABASE" \
+                    --backend-user "$TORODB_BACKEND_USER" \
+                    --sync-source "$TORODB_SYNC_SOURCE" \
+                    "$@"
+            else
+                echo "Database already configured. Skipping."
+                TORODB_SETUP=false
+            fi
         fi
     fi
     
@@ -72,6 +76,7 @@ then
     echo "ENV_PATH PATH=$PATH" >> /etc/login.defs
     
     set -- @{assembler.name} \
+        --backend "$TORODB_BACKEND" \
         --backend-host "$TORODB_BACKEND_HOST" \
         --backend-port "$TORODB_BACKEND_PORT" \
         --backend-database "$TORODB_BACKEND_DATABASE" \

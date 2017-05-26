@@ -1,7 +1,7 @@
 version: '2'
 services:
   torodb-stampede:
-    image: torodb/stampede:1.0.0-beta2-SNAPSHOT-mysql
+    image: torodb/stampede
     links:
       - mysql
       - mongodb
@@ -19,7 +19,7 @@ services:
     entrypoint:
       - /bin/bash
       - "-c"
-      - sleep 10;
+      - sleep 20;
         /maven/bin/entry-point torodb-stampede --backend mysql
   mysql:
     image: mysql:5.7
@@ -29,7 +29,7 @@ services:
       - MYSQL_PASSWORD=torodb
       - MYSQL_DATABASE=torod
     ports:
-      - "13306:3306"
+      - "4306:3306"
     entrypoint:
       - /bin/bash
       - "-c"
@@ -60,5 +60,5 @@ services:
             }; 
             rs.initiate({_id:"rs1",members:[{_id:0,host:"mongodb:27017"}]});
         ' 1>/dev/null 2>&1 & 
-        mongod --replSet rs1
+        exec /usr/bin/mongod --replSet rs1
         
